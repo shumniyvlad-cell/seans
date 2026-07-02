@@ -683,6 +683,12 @@
         <input id="admDonHint" value="${esc(don.payHint || "")}" placeholder="Как платить (наличкой в баре / перевод…)" />
       </div>
       <div class="adm__block">
+        <label class="adm__lbl">Сервер (общий счёт для всего дома)</label>
+        <p class="adm__note" id="admSrvState" style="margin-bottom:10px">Проверяю связь…</p>
+        <button class="adm__btn primary" id="admPublish">Опубликовать все правки на сервер</button>
+        <p class="adm__note" style="margin-top:8px">Фильмы, меню, афиша и раунд голосования из ЭТОГО браузера станут видны всем соседям на сайте.</p>
+      </div>
+      <div class="adm__block">
         <label class="adm__lbl">Бэкап</label>
         <p class="adm__note" style="margin-bottom:10px">Правки живут в этом браузере. Скачай бэкап, чтобы не потерять или перенести на другой комп.</p>
         <div class="adm__search">
@@ -698,6 +704,29 @@
         </div>
         <p class="adm__note" style="margin-top:10px">«Обнулить голоса» ставит счётчики всех фильмов на 0 (голосование с чистого листа). «Сбросить правки» вернёт фильмы, меню и афишу к исходным из config.js — брони не тронет.</p>
       </div>`;
+
+    // связь с сервером + явная публикация всех правок
+    (async () => {
+      const st = $("#admSrvState", body);
+      const A = window.SEANS_API;
+      if (!A || !A.enabled) { if (st) st.textContent = "Сервер не настроен (config.js → api) — правки живут только в этом браузере."; return; }
+      const ok = await A.refresh();
+      if (st) st.textContent = ok
+        ? "Сервер на связи ✓ — правки публикуются автоматически при каждом изменении."
+        : "Сервер сейчас недоступен — правки сохраняются в этом браузере, опубликуешь позже.";
+    })();
+    $("#admPublish", body).addEventListener("click", async () => {
+      const A = window.SEANS_API;
+      const st = $("#admSrvState", body);
+      if (!A || !A.enabled) { alert("Сервер не настроен."); return; }
+      try {
+        await A.publish(contentSnapshot(), PIN);
+        await window.__seans?.sync();
+        if (st) st.textContent = "Опубликовано ✓ — соседи увидят твои фильмы, меню и афишу.";
+      } catch (e) {
+        if (st) st.textContent = "Не получилось: сервер недоступен. Попробуй позже.";
+      }
+    });
 
     $("#admDonOn", body).addEventListener("change", (e) => { don.enabled = e.target.checked; save(); });
     $("#admDonSum", body).addEventListener("change", (e) => { don.perSeat = Math.max(0, Number(e.target.value) || 0); save(); });
