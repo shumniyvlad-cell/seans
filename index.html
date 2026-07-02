@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>СЕАНС — домашний кинозал</title>
+  <meta name="description" content="Домашний кинозал в нашем доме. Голосуем за фильмы, записываемся на сеансы, берём попкорн в баре." />
+  <meta name="theme-color" content="#0a0a0b" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css?v=19" />
+</head>
+<body>
+  <!-- film grain + vignette overlays -->
+  <div class="grain" aria-hidden="true"></div>
+
+  <!-- NAV -->
+  <header class="nav" id="nav">
+    <a href="#top" class="brand" aria-label="СЕАНС — на главную">
+      <span class="brand__mark">СЕАНС</span>
+      <span class="brand__sub" id="brandSub">домашний кинозал</span>
+    </a>
+    <nav class="nav__links" aria-label="Разделы">
+      <a href="#voting">Голосование</a>
+      <a href="#schedule">Расписание</a>
+      <a href="#bar">Бар</a>
+      <a href="#hall">Зал</a>
+    </nav>
+    <div class="nav__actions">
+      <button class="cartbtn" id="cartBtn" aria-label="Заказ в баре">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 4h2l2.4 12.2a1 1 0 0 0 1 .8h8.2a1 1 0 0 0 1-.8L21 8H7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10" cy="20" r="1.3" fill="currentColor"/><circle cx="18" cy="20" r="1.3" fill="currentColor"/></svg>
+        <span class="cartbtn__count" id="cartCount">0</span>
+        <span class="cartbtn__sum" id="cartSum">0&nbsp;₽</span>
+      </button>
+      <a class="btn btn--ghost btn--sm nav__chat" id="navChat" href="#" target="_blank" rel="noopener">В чат дома</a>
+      <button class="burger" id="burger" aria-label="Меню" aria-controls="mnav">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <!-- мобильное меню -->
+  <nav class="mnav" id="mnav" aria-label="Разделы">
+    <a href="#voting">Голосование</a>
+    <a href="#schedule">Расписание</a>
+    <a href="#bar">Бар</a>
+    <a href="#hall">Зал</a>
+    <a href="#" id="mnavChat" target="_blank" rel="noopener">Чат дома →</a>
+  </nav>
+
+  <main id="top">
+    <!-- HERO -->
+    <section class="hero" id="hero">
+      <div class="hero__bg" id="heroBg"></div>
+      <video class="hero__video" id="heroVideo" muted playsinline preload="auto" aria-hidden="true"></video>
+      <div class="hero__yt" id="heroYt" aria-hidden="true"></div>
+      <div class="hero__scrim"></div>
+      <div class="hero__inner">
+        <div class="hero__copy">
+          <p class="eyebrow" id="heroEyebrow">В афише кинозала</p>
+          <h1 class="hero__title" id="heroTitle">—</h1>
+          <p class="hero__meta" id="heroMeta">—</p>
+          <p class="hero__director" id="heroDirector"></p>
+          <div class="hero__cta">
+            <a class="btn btn--primary" id="heroVote" href="#voting">Голосовать за фильм</a>
+            <a class="btn btn--ghost" href="#schedule">Все сеансы</a>
+          </div>
+          <div class="hero__dots" id="heroDots" role="tablist" aria-label="Фильмы в афише"></div>
+        </div>
+      </div>
+      <!-- marquee ticker -->
+      <div class="marquee" aria-hidden="true">
+        <div class="marquee__track" id="marqueeTrack"></div>
+      </div>
+    </section>
+
+    <!-- VOTING -->
+    <section class="section" id="voting">
+      <div class="section__head">
+        <div>
+          <p class="eyebrow">Голосование</p>
+          <h2 class="section__title" id="votingTitle">—</h2>
+          <p class="section__sub" id="votingSub">—</p>
+        </div>
+        <div class="vote-status">
+          <div class="countdown" id="countdown" aria-live="polite">
+            <span class="countdown__label">До закрытия</span>
+            <span class="countdown__value" id="countdownValue">—</span>
+          </div>
+          <p class="vote-total" id="voteTotal"></p>
+        </div>
+      </div>
+      <div class="posters" id="posters"></div>
+
+      <!-- пожелания соседей: из них соберётся следующее голосование -->
+      <div class="suggest" id="suggestBlock">
+        <p class="eyebrow">Идеи на следующую неделю</p>
+        <h3 class="suggest__title">Предложи свой фильм</h3>
+        <p class="section__sub">Из ваших предложений соберём следующее голосование.</p>
+        <div class="suggest__form">
+          <input id="sgTitle" maxlength="80" placeholder="Какой фильм хочешь посмотреть?" />
+          <input id="sgName" maxlength="30" placeholder="Твоё имя" />
+          <button class="btn btn--primary" id="sgAdd">Предложить</button>
+        </div>
+        <div class="suggest__list" id="sgList"></div>
+      </div>
+    </section>
+
+    <!-- SCHEDULE -->
+    <section class="section section--tight" id="schedule">
+      <div class="section__head">
+        <div>
+          <p class="eyebrow">Афиша</p>
+          <h2 class="section__title">Расписание сеансов</h2>
+        </div>
+      </div>
+      <div class="schedule" id="scheduleList"></div>
+    </section>
+
+    <!-- BAR / MENU -->
+    <section class="section" id="bar">
+      <div class="section__head">
+        <div>
+          <p class="eyebrow">Бар кинозала</p>
+          <h2 class="section__title">Меню к сеансу</h2>
+          <p class="section__sub">Собери заказ — заберёшь в баре перед показом или прямо к креслу.</p>
+        </div>
+      </div>
+      <div class="menu" id="menu"></div>
+    </section>
+
+    <!-- HALL -->
+    <section class="section" id="hall">
+      <div class="section__head">
+        <div>
+          <p class="eyebrow">Наш зал</p>
+          <h2 class="section__title">Кино как в кинотеатре — только свои</h2>
+        </div>
+      </div>
+      <div class="hall">
+        <div class="hall__text">
+          <p id="hallAbout"></p>
+          <div class="steps">
+            <div class="step"><span class="step__n">01</span><div><b>Голосуй</b><span>Выбираем фильм вместе</span></div></div>
+            <div class="step"><span class="step__n">02</span><div><b>Записывайся</b><span>Бронируй место на сеанс</span></div></div>
+            <div class="step"><span class="step__n">03</span><div><b>Приходи</b><span>Бери попкорн — и в зал</span></div></div>
+          </div>
+        </div>
+        <div class="specs" id="specs"></div>
+      </div>
+      <div class="gallery" id="gallery"></div>
+    </section>
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="footer__ready" id="footerReady">—</div>
+    <div class="footer__grid">
+      <div class="footer__brand">
+        <span class="brand__mark">СЕАНС</span>
+        <p id="footerPlace">—</p>
+      </div>
+      <div class="footer__col">
+        <a href="#voting">Голосование</a>
+        <a href="#schedule">Расписание</a>
+        <a href="#bar">Бар</a>
+        <a href="#hall">Зал</a>
+      </div>
+      <div class="footer__qr">
+        <a id="qrLink" href="#" target="_blank" rel="noopener" aria-label="Чат дома в Telegram">
+          <img class="qr" id="qrImg" alt="QR: чат дома" loading="lazy" />
+        </a>
+        <span>Наведи камеру — вход в чат&nbsp;дома</span>
+      </div>
+    </div>
+    <p class="footer__legal">Домашний кинозал для жильцов. Сделано с любовью к кино.
+      <button class="adminlink" id="adminLink">⚙ Для администратора</button></p>
+  </footer>
+
+  <!-- CART DRAWER -->
+  <div class="drawer" id="drawer" aria-hidden="true">
+    <div class="drawer__scrim" id="drawerScrim"></div>
+    <aside class="drawer__panel" role="dialog" aria-label="Твой заказ" aria-modal="true">
+      <div class="drawer__head">
+        <h3>Твой заказ</h3>
+        <button class="drawer__close" id="drawerClose" aria-label="Закрыть">✕</button>
+      </div>
+      <div class="drawer__body" id="drawerBody"></div>
+      <div class="drawer__foot">
+        <div class="drawer__total"><span>Итого</span><span id="drawerTotal">0&nbsp;₽</span></div>
+        <button class="btn btn--primary btn--block" id="checkoutBtn">Оформить предзаказ</button>
+        <p class="drawer__note" id="drawerNote">Оплата в баре. Заказ ждёт тебя к началу сеанса.</p>
+      </div>
+    </aside>
+  </div>
+
+  <!-- FILM MODAL (описание + трейлер) -->
+  <div class="modal" id="filmModal" aria-hidden="true">
+    <div class="modal__scrim" data-close></div>
+    <div class="modal__card modal__card--film" role="dialog" aria-modal="true" aria-label="О фильме">
+      <button class="modal__close" data-close aria-label="Закрыть">✕</button>
+      <div id="filmBody"></div>
+    </div>
+  </div>
+
+  <!-- BOOKING MODAL -->
+  <div class="modal" id="bookModal" aria-hidden="true">
+    <div class="modal__scrim" data-close></div>
+    <div class="modal__card" role="dialog" aria-modal="true" aria-label="Бронирование места">
+      <button class="modal__close" data-close aria-label="Закрыть">✕</button>
+      <div id="bookBody"></div>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="config.js?v=19"></script>
+  <script src="store.js?v=19"></script>
+  <script src="app.js?v=19"></script>
+  <script src="admin.js?v=19"></script>
+</body>
+</html>
