@@ -62,7 +62,27 @@
   if (link) link.addEventListener("click", requestOpen);
   if (/[?#&]admin/.test(location.search + location.hash)) setTimeout(requestOpen, 400);
 
-  const save = () => S.save();   // persist + сайт перерисуется сам (STORE.onChange)
+  // persist + сайт перерисуется сам (STORE.onChange) + публикация на сервер (соседи увидят)
+  function contentSnapshot() {
+    return {
+      votingOptions: D.voting.options,
+      menu: D.menu,
+      schedule: D.schedule,
+      votingRound: D.votingRound || null,
+      donation: D.donation || null,
+    };
+  }
+  let pubT = null;
+  function publish() {
+    const A = window.SEANS_API;
+    if (!A || !A.enabled) return;
+    clearTimeout(pubT);
+    pubT = setTimeout(() => {
+      A.publish(contentSnapshot(), PIN).catch(() => log("не удалось опубликовать на сервер — правки пока только в этом браузере"));
+    }, 400);
+  }
+  function log(msg) { try { console.warn("СЕАНС админ:", msg); } catch (e) {} }
+  const save = () => { S.save(); publish(); };
 
   /* ============================================================
      ФИЛЬМЫ — поиск по Википедии (RU): название, год, описание
@@ -146,7 +166,10 @@
     function renderSgAdmin() {
       const wrap = $("#admSg", body);
       if (!wrap) return;
-      const sgs = (window.__seans ? window.__seans.getSuggestions() : []).slice().reverse();
+      const A = window.SEANS_API;
+      const sgs = (A && A.ready && A.state)
+        ? (A.state.suggestions || [])
+        : (window.__seans ? window.__seans.getSuggestions() : []).slice().reverse();
       wrap.innerHTML = sgs.length
         ? sgs.map((s) => `
           <div class="adm__row">
@@ -163,8 +186,9 @@
         q.scrollIntoView({ block: "center" });
       }));
       $$("[data-delsg]", wrap).forEach((b) => b.addEventListener("click", () => {
-        window.__seans?.removeSuggestion(b.dataset.delsg);
-        renderSgAdmin();
+        const A2 = window.SEANS_API;
+        if (A2 && A2.ready) A2.adminRemove("suggestion", b.dataset.delsg, PIN).then(() => window.__seans?.sync()).then(renderSgAdmin).catch(() => alert("Сервер недоступен"));
+        else { window.__seans?.removeSuggestion(b.dataset.delsg); renderSgAdmin(); }
       }));
     }
 
@@ -331,6 +355,8 @@
       D.votingRound = { closesAt: t.toISOString(), done: false };
       D.voting.options.forEach((o) => { o.baseVotes = 0; });
       window.__seans?.resetMyVote();
+      const A = window.SEANS_API;
+      if (A && A.enabled) A.adminClear("votes", PIN).then(() => window.__seans?.sync()).catch(() => {});
       save();
       tabVote();
     });
@@ -339,8 +365,15 @@
       if (!D.votingRound || !D.votingRound.closesAt) { alert("Сначала запусти голосование."); return; }
       if (D.votingRound.done) { alert("Раунд уже завершён."); return; }
       if (!confirm("Завершить голосование и поставить победителя в афишу?")) return;
-      window.__seans?.finishVoting();
-      tabVote();
+      const A = window.SEANS_API;
+      if (A && A.enabled) {
+        // финализирует сервер (общий счёт), потом подтягиваем результат
+        A.finish(PIN).then(() => window.__seans?.sync()).then(() => tabVote())
+          .catch(() => { window.__seans?.finishVoting(); tabVote(); });
+      } else {
+        window.__seans?.finishVoting();
+        tabVote();
+      }
     });
   }
 
@@ -549,9 +582,17 @@
   };
   const ruWhen = (ts) => new Date(ts).toLocaleString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
-  function tabBooks() {
-    const api = window.__seans;
-    const bookings = (api ? api.getBookings() : []).slice().sort((a, b) => b.ts - a.ts);
+  async function tabBooks() {
+    const A = window.SEANS_API;
+    let bookings = null, srv = false;
+    if (A && A.enabled) {
+      body.innerHTML = `<p class="adm__note">Загружаю брони с сервера…</p>`;
+      try { const d = await A.adminData(PIN); bookings = d.bookings || []; srv = true; }
+      catch (e) { /* сервер недоступен — показываем локальные */ }
+    }
+    if (!srv) bookings = (window.__seans ? window.__seans.getBookings() : []);
+    if (activeTab !== "books") return;   // пока грузили — переключили вкладку
+    bookings = bookings.slice().sort((a, b) => b.ts - a.ts);
     const bySession = {};
     bookings.forEach((b) => { (bySession[b.sid] = bySession[b.sid] || []).push(b); });
     const sessionName = sessName;
@@ -574,20 +615,28 @@
         `<button class="adm__btn danger" id="admClearBooks">Очистить все брони</button>`;
 
     $$("[data-delbook]", body).forEach((b) => b.addEventListener("click", () => {
-      window.__seans?.removeBooking(b.dataset.delbook);
-      tabBooks();
+      if (srv) A.adminRemove("booking", b.dataset.delbook, PIN).then(() => { window.__seans?.sync(); tabBooks(); }).catch(() => alert("Сервер недоступен"));
+      else { window.__seans?.removeBooking(b.dataset.delbook); tabBooks(); }
     }));
     const clr = $("#admClearBooks", body);
     if (clr) clr.addEventListener("click", () => {
       if (!confirm("Точно снести все брони?")) return;
-      window.__seans?.clearBookings();
-      tabBooks();
+      if (srv) A.adminClear("bookings", PIN).then(() => { window.__seans?.sync(); tabBooks(); }).catch(() => alert("Сервер недоступен"));
+      else { window.__seans?.clearBookings(); tabBooks(); }
     });
   }
 
-  function tabOrders() {
-    const api = window.__seans;
-    const orders = (api ? api.getOrders() : []).slice().sort((a, b) => b.ts - a.ts);
+  async function tabOrders() {
+    const A = window.SEANS_API;
+    let orders = null, srv = false;
+    if (A && A.enabled) {
+      body.innerHTML = `<p class="adm__note">Загружаю заказы с сервера…</p>`;
+      try { const d = await A.adminData(PIN); orders = d.orders || []; srv = true; }
+      catch (e) { /* сервер недоступен — локальные */ }
+    }
+    if (!srv) orders = (window.__seans ? window.__seans.getOrders() : []);
+    if (activeTab !== "orders") return;
+    orders = orders.slice().sort((a, b) => b.ts - a.ts);
     const totalSum = orders.reduce((a, o) => a + (Number(o.total) || 0), 0);
     body.innerHTML = !orders.length
       ? `<p class="adm__note">Заказов пока нет. Сосед соберёт корзину в «Баре», впишет имя — и заказ появится тут.</p>`
@@ -604,14 +653,14 @@
         `<button class="adm__btn danger" id="admClearOrders" style="margin-top:14px">Очистить все заказы</button>`;
 
     $$("[data-delorder]", body).forEach((b) => b.addEventListener("click", () => {
-      window.__seans?.removeOrder(b.dataset.delorder);
-      tabOrders();
+      if (srv) A.adminRemove("order", b.dataset.delorder, PIN).then(tabOrders).catch(() => alert("Сервер недоступен"));
+      else { window.__seans?.removeOrder(b.dataset.delorder); tabOrders(); }
     }));
     const clr2 = $("#admClearOrders", body);
     if (clr2) clr2.addEventListener("click", () => {
       if (!confirm("Точно снести все заказы?")) return;
-      window.__seans?.clearOrders();
-      tabOrders();
+      if (srv) A.adminClear("orders", PIN).then(tabOrders).catch(() => alert("Сервер недоступен"));
+      else { window.__seans?.clearOrders(); tabOrders(); }
     });
   }
 
@@ -677,6 +726,8 @@
       if (!confirm("Обнулить голоса всех фильмов?")) return;
       D.voting.options.forEach((o) => { o.baseVotes = 0; });
       window.__seans?.resetMyVote();
+      const A = window.SEANS_API;
+      if (A && A.enabled) A.adminClear("votes", PIN).then(() => window.__seans?.sync()).catch(() => {});
       save();
     });
     $("#admReset", body).addEventListener("click", () => {

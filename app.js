@@ -265,8 +265,12 @@
   const star = `<svg viewBox="0 0 24 24" width="13" height="13"><path d="M12 3l2.5 5.6 6.1.6-4.6 4 1.4 6-5.4-3.2L6.6 19l1.4-6-4.6-4 6.1-.6z" fill="currentColor"/></svg>`;
 
   function tally() {
+    // общий счёт: если сервер на связи — голоса оттуда (все соседи), иначе локально
+    const A = window.SEANS_API;
+    const sv = A && A.ready && A.state ? (A.state.votes || {}) : null;
     const rows = (C.voting.options || []).map((o) => ({
-      ...o, votes: (Number(o.baseVotes) || 0) + (state.vote === o.id ? 1 : 0),
+      ...o,
+      votes: sv ? (Number(sv[o.id]) || 0) : (Number(o.baseVotes) || 0) + (state.vote === o.id ? 1 : 0),
     }));
     const total = rows.reduce((s, r) => s + r.votes, 0);
     const max = rows.length ? Math.max(...rows.map((r) => r.votes)) : 0;
@@ -334,9 +338,17 @@
     if (votingClosed()) { toast("Голосование уже закрыто"); return; }
     const opt = (C.voting.options || []).find((o) => o.id === id);
     if (!opt) return;
-    if (state.vote === id) { state.vote = null; toast("Голос отозван"); }
-    else { state.vote = id; toast(`Голос учтён за <b>«${esc(opt.title)}»</b>`); }
+    const un = state.vote === id;
+    state.vote = un ? null : id;
     saveVote();
+    toast(un ? "Голос отозван" : `Голос учтён за <b>«${esc(opt.title)}»</b>`);
+    const A = window.SEANS_API;
+    if (A && A.enabled) {
+      A.vote(un ? null : id).then((r) => {
+        if (A.state) { A.state.votes = r.votes; A.state.myVote = r.myVote; }
+        renderVoting();
+      }).catch(() => {});   // сервер лёг — голос остался локально
+    }
     renderVoting();
   }
 
@@ -389,19 +401,30 @@
   function renderSuggest() {
     const list = $("#sgList");
     if (!list) return;
-    const items = state.suggestions.slice(-14).reverse();
+    const A = window.SEANS_API;
+    const items = (A && A.ready && A.state)
+      ? (A.state.suggestions || [])                       // общий список с сервера (уже свежие сверху)
+      : state.suggestions.slice(-14).reverse();
     list.innerHTML = items.length
       ? items.map((s) => `<span class="sg-chip"><b>${esc(s.title)}</b>${s.name ? `<span>${esc(s.name)}</span>` : ""}</span>`).join("")
       : `<span class="sg-chip sg-chip--empty">Пока пусто — предложи первым</span>`;
   }
   const sgBtn = $("#sgAdd");
   if (sgBtn) {
-    const submitSg = () => {
+    const submitSg = async () => {
       const t = $("#sgTitle");
       const title = t.value.trim();
       if (!title) { t.classList.remove("err"); void t.offsetWidth; t.classList.add("err"); t.focus(); return; }
-      state.suggestions.push({ id: "g" + Date.now().toString(36), title, name: $("#sgName").value.trim(), ts: Date.now() });
-      saveSg();
+      const name = $("#sgName").value.trim();
+      const A = window.SEANS_API;
+      let viaApi = false;
+      if (A && A.enabled) {
+        try { await A.suggest(title, name); await A.refresh(); viaApi = true; } catch (e) {}
+      }
+      if (!viaApi) {
+        state.suggestions.push({ id: "g" + Date.now().toString(36), title, name, ts: Date.now() });
+        saveSg();
+      }
       renderSuggest();
       t.value = "";
       toast(`Записал: <b>«${esc(title)}»</b> — учтём в следующем голосовании`);
@@ -485,6 +508,8 @@
     const ms = voteTarget() - new Date();
     if (!(ms > 0)) {                             // и прошедшие, и кривые даты (NaN)
       v.textContent = "Закрыто";
+      const A = window.SEANS_API;
+      if (A && A.ready) return;   // общий режим: раунд финализирует сервер, результат придёт с синком
       if (r && !r.done && !finishing) { finishing = true; try { finishVoting(); } finally { finishing = false; } }
       return;
     }
@@ -496,8 +521,16 @@
   /* ============================================================
      РАСПИСАНИЕ + БРОНИ
      ============================================================ */
-  const bookedFor = (sid) => state.bookings.filter((b) => b.sid === sid).reduce((a, b) => a + (Number(b.seats) || 0), 0);
-  const myBookingFor = (sid) => state.bookings.find((b) => b.sid === sid && state.mine.includes(b.id));
+  const bookedFor = (sid) => {
+    const A = window.SEANS_API;
+    if (A && A.ready && A.state && A.state.booked) return Number(A.state.booked[sid]) || 0;
+    return state.bookings.filter((b) => b.sid === sid).reduce((a, b) => a + (Number(b.seats) || 0), 0);
+  };
+  const myBookingFor = (sid) => {
+    const A = window.SEANS_API;
+    if (A && A.ready && A.state) return (A.state.myBookings || []).find((b) => b.sid === sid);
+    return state.bookings.find((b) => b.sid === sid && state.mine.includes(b.id));
+  };
   const seatsLeftFor = (s) => Math.max(0, (Number(s.seatsLeft) || 0) - bookedFor(s.id));
 
   const schedWrap = $("#scheduleList");
@@ -562,6 +595,14 @@
   }
 
   function cancelBooking(id) {
+    const A = window.SEANS_API;
+    if (A && A.ready && (A.state.myBookings || []).some((b) => b.id === id)) {
+      A.cancelBooking(id)
+        .then(() => A.refresh())
+        .then(() => { renderSchedule(); toast("Бронь отменена"); })
+        .catch(() => toast("Не получилось связаться с сервером — попробуй ещё раз"));
+      return;
+    }
     const b = state.bookings.find((x) => x.id === id);
     if (!b || !state.mine.includes(id)) return;
     state.bookings = state.bookings.filter((x) => x.id !== id);
@@ -611,7 +652,7 @@
     };
     $("#bMinus").onclick = () => { seats = Math.max(1, seats - 1); $("#bCount").textContent = seats; updDon(); };
     $("#bPlus").onclick = () => { seats = Math.min(maxSeats, seats + 1); $("#bCount").textContent = seats; updDon(); };
-    $("#bGo").onclick = () => {
+    $("#bGo").onclick = async () => {
       const nameEl = $("#bName");
       const name = nameEl.value.trim();
       if (!name) { nameEl.classList.remove("err"); void nameEl.offsetWidth; nameEl.classList.add("err"); nameEl.focus(); return; }
@@ -620,9 +661,22 @@
         sid, name, apt: $("#bApt").value.trim(), seats, ts: Date.now(),
         don: don ? seats * Number(don.perSeat) : 0,
       };
-      state.bookings.push(b);
-      state.mine.push(b.id);
-      saveBookings();
+      // общий счёт: бронь на сервер (все соседи видят занятые места), офлайн — локально
+      const A = window.SEANS_API;
+      let viaApi = false;
+      if (A && A.enabled) {
+        try {
+          const r = await A.book({ sid, name, apt: b.apt, seats, don: b.don });
+          b.id = r.id;
+          viaApi = true;
+          await A.refresh();
+        } catch (e) { /* сервер лёг — падаем в локальный режим */ }
+      }
+      if (!viaApi) {
+        state.bookings.push(b);
+        state.mine.push(b.id);
+        saveBookings();
+      }
       renderSchedule();
       mBody.innerHTML = `
         <div class="ticket">
@@ -811,6 +865,12 @@
       };
       state.orders.push(lastOrder);
       saveOrders();
+      // и на сервер — чтобы админ видел заказы всех соседей
+      const A = window.SEANS_API;
+      if (A && A.enabled) {
+        A.order({ name: lastOrder.name, apt: lastOrder.apt, sid: lastOrder.sid, items: lastOrder.items, total: lastOrder.total })
+          .catch(() => {});
+      }
       state.cart = {}; saveCart(); updateCartUI();
       drawerStep = "done";
       renderDrawer();
@@ -889,11 +949,47 @@
     getSuggestions: () => state.suggestions.slice(),
     removeSuggestion(id) { state.suggestions = state.suggestions.filter((x) => x.id !== id); saveSg(); renderSuggest(); },
     clearSuggestions() { state.suggestions = []; saveSg(); renderSuggest(); },
+    sync: () => syncFromServer(),
   };
   if (window.STORE) window.STORE.onChange(renderAll);
+
+  /* ---------- синк с сервером (общий счёт для всего дома) ---------- */
+  let lastContentSig = "", lastLiveSig = "";
+  function applyServer(st) {
+    const c = st.content;
+    if (c) {
+      if (Array.isArray(c.votingOptions)) C.voting.options = c.votingOptions;
+      if (Array.isArray(c.menu)) C.menu = c.menu;
+      if (Array.isArray(c.schedule)) C.schedule = c.schedule;
+      C.votingRound = c.votingRound || null;
+      if (c.donation) C.donation = c.donation;
+    }
+    if (st.myVote !== undefined) { state.vote = st.myVote; saveVote(); }
+  }
+  async function syncFromServer() {
+    const A = window.SEANS_API;
+    if (!A || !A.enabled) return;
+    const st = await A.refresh();
+    if (!st) return;
+    const contentSig = JSON.stringify(st.content || null);
+    const liveSig = JSON.stringify([st.votes, st.booked, st.suggestions, st.myVote, (st.myBookings || []).length]);
+    if (contentSig !== lastContentSig) {
+      // контент админки изменился (фильмы/меню/афиша/раунд) — полная перерисовка
+      lastContentSig = contentSig; lastLiveSig = liveSig;
+      applyServer(st);
+      renderAll();
+    } else if (liveSig !== lastLiveSig) {
+      // изменились только голоса/брони/пожелания — без перезапуска героя
+      lastLiveSig = liveSig;
+      applyServer(st);
+      renderVoting(); renderSchedule(); renderSuggest();
+    }
+  }
 
   renderAll();
   tickCountdown();
   setInterval(tickCountdown, 1000);
   observeReveal(document);
+  syncFromServer();                       // первый синк сразу
+  setInterval(syncFromServer, 25000);     // и дальше — живые счётчики у всех
 })();
