@@ -31,6 +31,25 @@
     if (!s.id) s.id = (s.day + "-" + s.date + "-" + s.time + "-" + (s.title || "")).replace(/\s+/g, "_");
   });
 
+  // сам-чиним раунд голосования: дедлайн не позже 12:00 дня показа.
+  // Лечит раунды, запущенные старой (закэшированной) версией админки, без сброса голосов.
+  (function normalizeRound() {
+    const r = data.votingRound;
+    if (!r || r.done || !r.closesAt) return;
+    const show = new Date(r.showAt || r.closesAt);
+    if (isNaN(show)) return;
+    const now = new Date();
+    let dl = new Date(show);
+    dl.setHours(12, 0, 0, 0);
+    if (dl <= now) dl = new Date(show.getTime() - 3600e3);
+    if (dl <= now) dl = new Date(show.getTime());
+    if (!r.showAt || new Date(r.closesAt) > dl) {
+      r.showAt = show.toISOString();
+      r.closesAt = dl.toISOString();
+      persist();
+    }
+  })();
+
   const listeners = [];
   function persist() {
     // сохраняем только то, что реально редактируется в админке
