@@ -461,12 +461,19 @@
     if (r && r.done) return true;
     return !(voteTarget() - new Date() > 0);
   }
-  // «Что смотрим в эту среду, 8 июля?» — из даты раунда; без раунда — заголовок из config
+  // дата ПОКАЗА раунда (showAt; старые раунды хранили только closesAt)
+  function roundShowDate() {
+    const r = C.votingRound;
+    if (!r) return null;
+    const d = new Date(r.showAt || r.closesAt);
+    return isNaN(d) ? null : d;
+  }
+  // «Что смотрим в эту среду, 8 июля?» — из даты показа; без раунда — заголовок из config
   function votingTitle() {
     const r = C.votingRound;
     if (!r || !r.closesAt) return C.voting.title;
-    const d = new Date(r.closesAt);
-    if (isNaN(d)) return C.voting.title;
+    const d = roundShowDate();
+    if (!d) return C.voting.title;
     const wd = d.getDay();
     const wdiff = Math.round((weekStart(d) - weekStart(new Date())) / 6048e5);
     const mod = wdiff <= 0 ? THIS_NEXT[wd][0] : wdiff === 1 ? THIS_NEXT[wd][1] : "";
@@ -480,8 +487,8 @@
     const { rows } = tally();
     if (rows.length) {
       const w = rows.reduce((a, b) => (b.votes > a.votes ? b : a));
-      const d = new Date(r.closesAt);
-      const id = "s-vote-" + String(r.closesAt).slice(0, 10);
+      const d = roundShowDate() || new Date(r.closesAt);   // строка афиши — на дату/время ПОКАЗА
+      const id = "s-vote-" + String(r.showAt || r.closesAt).slice(0, 10);
       if (!isNaN(d) && !C.schedule.some((s) => s.id === id)) {
         C.schedule.push({
           id,
@@ -542,7 +549,7 @@
       const waiting = r && r.closesAt && !r.done && !isNaN(new Date(r.closesAt));
       let when = "";
       if (waiting) {
-        const d = new Date(r.closesAt);
+        const d = roundShowDate() || new Date(r.closesAt);
         when = ` Сеанс планируется в ${DAY_ACC[d.getDay()]}, ${fmtDateRu(d)} в ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}.`;
       }
       schedWrap.innerHTML = `

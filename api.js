@@ -18,9 +18,15 @@
   async function post(path, body, pin) {
     const headers = { "Content-Type": "application/json" };
     if (pin) headers["X-Pin"] = pin;
-    const r = await fetch(BASE + path, { method: "POST", headers, body: JSON.stringify(body || {}) });
-    if (!r.ok) throw new Error("api " + r.status);
-    return r.json();
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 8000);   // сервер молчит — быстро падаем в локальный режим
+    try {
+      const r = await fetch(BASE + path, { method: "POST", headers, body: JSON.stringify(body || {}), signal: ctrl.signal });
+      if (!r.ok) throw new Error("api " + r.status);
+      return await r.json();
+    } finally {
+      clearTimeout(t);
+    }
   }
 
   const S = {

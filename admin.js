@@ -304,11 +304,12 @@
      ============================================================ */
   function tabVote() {
     const r = D.votingRound;
+    const ruDT = (iso) => new Date(iso).toLocaleString("ru-RU", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
     const stateLine = r && r.closesAt
       ? (r.done
         ? "Раунд закрыт — победитель уже в афише."
-        : "Идёт: «" + (window.__seans ? window.__seans.votingTitle() : "") + "» · закроется " +
-          new Date(r.closesAt).toLocaleString("ru-RU", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }))
+        : "Идёт: «" + (window.__seans ? window.__seans.votingTitle() : "") + "» · голосуем до " + ruDT(r.closesAt)
+          + (r.showAt ? " · показ " + ruDT(r.showAt) : ""))
       : "Раунд не запущен — на сайте заголовок из config.js, дедлайн по умолчанию (ближайшая пятница 20:00).";
 
     body.innerHTML = `
@@ -329,7 +330,7 @@
           <input id="admTime" value="20:00" placeholder="20:00" style="max-width:110px" />
         </div>
         <button class="adm__btn primary" id="admLaunch" style="margin-top:12px">Запустить голосование</button>
-        <p class="adm__note" style="margin-top:8px">Счётчики обнулятся, а заголовок и дата подставятся сами — вида «Что смотрим в эту среду, 8 июля?». Когда время выйдет (или нажмёшь «Завершить»), победитель автоматически встанет в расписание на эту дату.</p>
+        <p class="adm__note" style="margin-top:8px">Счётчики обнулятся, заголовок и дата подставятся сами. Голосование закроется <b>в 12:00 дня показа</b> — соседи заранее узнают фильм и успеют забронировать места. Победитель встанет в расписание автоматически.</p>
       </div>
       <div class="adm__block">
         <label class="adm__lbl">Завершение</label>
@@ -352,7 +353,13 @@
       const m = ($("#admTime", body).value || "20:00").match(/^(\d{1,2})[:.](\d{2})$/);
       t.setHours(m ? Math.min(23, +m[1]) : 20, m ? Math.min(59, +m[2]) : 0, 0, 0);
       if (t <= now) t.setDate(t.getDate() + 7);      // сегодняшний день, но время уже прошло → через неделю
-      D.votingRound = { closesAt: t.toISOString(), done: false };
+      // голосование закрывается в 12:00 дня показа (люди должны знать фильм заранее);
+      // запускаем позже полудня — тогда за час до сеанса
+      const dl = new Date(t);
+      dl.setHours(12, 0, 0, 0);
+      if (dl <= now) dl.setTime(t.getTime() - 3600e3);
+      if (dl <= now) dl.setTime(t.getTime());
+      D.votingRound = { closesAt: dl.toISOString(), showAt: t.toISOString(), done: false };
       D.voting.options.forEach((o) => { o.baseVotes = 0; });
       window.__seans?.resetMyVote();
       const A = window.SEANS_API;
