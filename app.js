@@ -489,6 +489,8 @@
       const w = rows.reduce((a, b) => (b.votes > a.votes ? b : a));
       const d = roundShowDate() || new Date(r.closesAt);   // строка афиши — на дату/время ПОКАЗА
       const id = "s-vote-" + String(r.showAt || r.closesAt).slice(0, 10);
+      // заглушка «Решает голосование» отработала — победитель её заменяет
+      C.schedule = C.schedule.filter((s) => !(/голосован/i.test(s.status || "") || /голосован/i.test(s.title || "")));
       if (!isNaN(d) && !C.schedule.some((s) => s.id === id)) {
         C.schedule.push({
           id,
