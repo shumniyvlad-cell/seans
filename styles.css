@@ -513,6 +513,33 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 }
 
 /* ============================================================
+   КОД ДОМА — замок на вход
+   ============================================================ */
+body.gated { overflow: hidden; }
+.gate {
+  position: fixed; inset: 0; z-index: 10000;
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(229,52,43,.08), transparent 55%),
+    var(--bg);
+  opacity: 1; transition: opacity .6s ease;
+}
+.gate--open { opacity: 0; pointer-events: none; }
+.gate__inner { width: min(360px, 92vw); text-align: center; }
+.gate__brand { font-family: var(--font-disp); font-size: 54px; letter-spacing: .18em; }
+.gate__sub { font-size: 12px; text-transform: uppercase; letter-spacing: .24em; color: var(--muted); margin: 8px 0 44px; }
+.gate__label { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .16em; color: var(--ink-dim); margin-bottom: 12px; }
+.gate__row { display: flex; gap: 10px; }
+.gate__row input {
+  flex: 1; min-width: 0; background: #101014; border: 1px solid var(--line-2); border-radius: 14px;
+  color: var(--ink); font-family: var(--font-head); font-size: 26px; text-align: center;
+  letter-spacing: .3em; padding: 12px 14px; outline: none; transition: border-color .2s;
+}
+.gate__row input:focus { border-color: var(--accent); }
+.gate__row input.err { border-color: var(--accent); animation: shake .3s; }
+.gate__hint { font-size: 12.5px; color: var(--muted); margin-top: 16px; }
+
+/* ============================================================
    ГЕРОЙ: постер-подложка (когда нет трейлера / пока грузится)
    ============================================================ */
 .hero__bg.poster-mode {

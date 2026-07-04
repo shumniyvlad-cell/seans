@@ -72,6 +72,41 @@
   }
 
   /* ============================================================
+     КОД ДОМА — замок на вход (config.gate). Сверяем SHA-256 отпечаток,
+     сам код в исходниках не лежит. Один раз на устройство.
+     ============================================================ */
+  (function gate() {
+    const g = C.gate;
+    const el = $("#gate");
+    if (!el) return;
+    if (!g || !g.enabled || !g.hash || !window.crypto?.subtle) return;   // замок выключен
+    const LS_GATE = "seans_gate_v1";
+    if (localStorage.getItem(LS_GATE) === g.hash) return;                // уже входил
+    el.hidden = false;
+    document.body.classList.add("gated");
+    const inp = $("#gateCode"), hint = $("#gateHint");
+    if (hint && g.hint) hint.textContent = g.hint;
+    async function tryCode() {
+      const raw = (inp.value || "").trim();
+      if (!raw) { inp.focus(); return; }
+      const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
+      const hex = [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+      if (hex === g.hash) {
+        localStorage.setItem(LS_GATE, g.hash);
+        el.classList.add("gate--open");
+        document.body.classList.remove("gated");
+        setTimeout(() => { el.hidden = true; }, 650);
+      } else {
+        inp.classList.remove("err"); void inp.offsetWidth; inp.classList.add("err");
+        inp.select();
+      }
+    }
+    $("#gateGo").addEventListener("click", tryCode);
+    inp.addEventListener("keydown", (e) => { if (e.key === "Enter") tryCode(); });
+    setTimeout(() => inp.focus(), 300);
+  })();
+
+  /* ============================================================
      СТАТИКА (бренд, футер)
      ============================================================ */
   $("#brandSub").textContent = C.brand.tagline;

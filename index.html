@@ -10,11 +10,25 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=27" />
+  <link rel="stylesheet" href="styles.css?v=28" />
 </head>
 <body>
   <!-- film grain + vignette overlays -->
   <div class="grain" aria-hidden="true"></div>
+
+  <!-- КОД ДОМА: замок на вход (см. config.gate) -->
+  <div class="gate" id="gate" hidden>
+    <div class="gate__inner">
+      <div class="gate__brand">СЕАНС</div>
+      <p class="gate__sub">Домашний кинозал · только для своих</p>
+      <label class="gate__label" for="gateCode">Введи код дома</label>
+      <div class="gate__row">
+        <input id="gateCode" inputmode="numeric" autocomplete="one-time-code" maxlength="12" placeholder="••" />
+        <button class="btn btn--primary" id="gateGo">Войти</button>
+      </div>
+      <p class="gate__hint" id="gateHint"></p>
+    </div>
+  </div>
 
   <!-- NAV -->
   <header class="nav" id="nav">
@@ -217,10 +231,10 @@
   <!-- TOAST -->
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <script src="config.js?v=27"></script>
-  <script src="store.js?v=27"></script>
-  <script src="api.js?v=27"></script>
-  <script src="app.js?v=27"></script>
-  <script src="admin.js?v=27"></script>
+  <script src="config.js?v=28"></script>
+  <script src="store.js?v=28"></script>
+  <script src="api.js?v=28"></script>
+  <script src="app.js?v=28"></script>
+  <script src="admin.js?v=28"></script>
 </body>
 </html>
