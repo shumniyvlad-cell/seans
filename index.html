@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=28" />
+  <link rel="stylesheet" href="styles.css?v=29" />
 </head>
 <body>
   <!-- film grain + vignette overlays -->
@@ -22,10 +22,13 @@
       <div class="gate__brand">СЕАНС</div>
       <p class="gate__sub">Домашний кинозал · только для своих</p>
       <label class="gate__label" for="gateCode">Введи код дома</label>
+      <input class="gate__code" id="gateCode" inputmode="numeric" autocomplete="one-time-code" maxlength="12" placeholder="••" />
+      <label class="gate__label" for="gateName" style="margin-top:18px">Как тебя зовут</label>
       <div class="gate__row">
-        <input id="gateCode" inputmode="numeric" autocomplete="one-time-code" maxlength="12" placeholder="••" />
-        <button class="btn btn--primary" id="gateGo">Войти</button>
+        <input id="gateName" maxlength="40" placeholder="Имя" autocomplete="name" />
+        <input id="gateApt" maxlength="10" placeholder="Кв." inputmode="numeric" style="max-width:90px" />
       </div>
+      <button class="btn btn--primary btn--block" id="gateGo" style="margin-top:16px">Войти</button>
       <p class="gate__hint" id="gateHint"></p>
     </div>
   </div>
@@ -231,10 +234,10 @@
   <!-- TOAST -->
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <script src="config.js?v=28"></script>
-  <script src="store.js?v=28"></script>
-  <script src="api.js?v=28"></script>
-  <script src="app.js?v=28"></script>
-  <script src="admin.js?v=28"></script>
+  <script src="config.js?v=29"></script>
+  <script src="store.js?v=29"></script>
+  <script src="api.js?v=29"></script>
+  <script src="app.js?v=29"></script>
+  <script src="admin.js?v=29"></script>
 </body>
 </html>

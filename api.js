@@ -49,7 +49,7 @@
       }
       return S.ready ? S.state : null;
     },
-    vote: (optionId) => post("/api/vote", { device, optionId }),
+    vote: (optionId, name, apt) => post("/api/vote", { device, optionId, name: name || "", apt: apt || "" }),
     suggest: (title, name) => post("/api/suggest", { title, name }),
     book: (p) => post("/api/booking", Object.assign({ device }, p)),
     cancelBooking: (id) => post("/api/booking/cancel", { device, id }),

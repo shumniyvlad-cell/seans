@@ -351,7 +351,37 @@
       <div class="adm__block">
         <label class="adm__lbl">Завершение</label>
         <button class="adm__btn" id="admFinish">Завершить сейчас — победителя в афишу</button>
+      </div>
+      <div class="adm__block">
+        <label class="adm__lbl">Кто проголосовал</label>
+        <div id="admVoters"><p class="adm__note">Загружаю…</p></div>
       </div>`;
+
+    (async () => {
+      const wrap = $("#admVoters", body);
+      const A = window.SEANS_API;
+      if (!A || !A.enabled) { wrap.innerHTML = `<p class="adm__note">Видно при работающем сервере общего счёта.</p>`; return; }
+      let voters = [];
+      try { voters = (await A.adminData(PIN)).voters || []; }
+      catch (e) { wrap.innerHTML = `<p class="adm__note">Сервер недоступен.</p>`; return; }
+      if (activeTab !== "vote") return;
+      if (!voters.length) { wrap.innerHTML = `<p class="adm__note">Пока никто не голосовал.</p>`; return; }
+      const filmTitle = (id) => (D.voting.options.find((o) => o.id === id) || {}).title || "фильм убран из списка";
+      wrap.innerHTML = voters.map((v) => `
+        <div class="adm__row">
+          <div class="grow">
+            <b>${esc(v.name || "без имени")}${v.apt ? " · кв. " + esc(v.apt) : ""}</b>
+            <small>за «${esc(filmTitle(v.option_id))}» · ${ruWhen(v.ts)}</small>
+          </div>
+          <button class="adm__ico danger" data-delvote="${esc(v.device)}" title="Снять голос">✕</button>
+        </div>`).join("");
+      $$("[data-delvote]", wrap).forEach((b) => b.addEventListener("click", () => {
+        A.adminRemove("vote", b.dataset.delvote, PIN)
+          .then(() => window.__seans?.sync())
+          .then(() => tabVote())
+          .catch(() => alert("Сервер недоступен"));
+      }));
+    })();
 
     let selDay = 5;
     if (r && r.closesAt) { const d = new Date(r.closesAt); if (!isNaN(d)) selDay = d.getDay(); }

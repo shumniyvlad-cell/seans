@@ -15,6 +15,14 @@
   const LS_MINE = "seans_my_bookings_v1";
   const LS_ORDERS = "seans_orders_v1";
   const LS_SG = "seans_suggest_v1";
+  const LS_NAME = "seans_name_v1";
+  const LS_APT = "seans_apt_v1";
+  const myName = () => localStorage.getItem(LS_NAME) || "";
+  const myApt = () => localStorage.getItem(LS_APT) || "";
+  const saveMe = (name, apt) => {
+    if (name) localStorage.setItem(LS_NAME, name);
+    if (apt) localStorage.setItem(LS_APT, apt);
+  };
 
   const money = (n) => (Number(n) || 0).toLocaleString("ru-RU").replace(/\s/g, " ") + " ₽";
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -84,14 +92,23 @@
     if (localStorage.getItem(LS_GATE) === g.hash) return;                // уже входил
     el.hidden = false;
     document.body.classList.add("gated");
-    const inp = $("#gateCode"), hint = $("#gateHint");
+    const inp = $("#gateCode"), nameInp = $("#gateName"), aptInp = $("#gateApt"), hint = $("#gateHint");
     if (hint && g.hint) hint.textContent = g.hint;
+    if (nameInp) nameInp.value = myName();
+    if (aptInp) aptInp.value = myApt();
     async function tryCode() {
       const raw = (inp.value || "").trim();
       if (!raw) { inp.focus(); return; }
+      const nm = (nameInp?.value || "").trim();
+      if (nm.length < 2) {                    // подписываемся — соседям видно, кто голосует
+        nameInp.classList.remove("err"); void nameInp.offsetWidth; nameInp.classList.add("err");
+        nameInp.focus();
+        return;
+      }
       const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
       const hex = [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
       if (hex === g.hash) {
+        saveMe(nm, (aptInp?.value || "").trim());
         localStorage.setItem(LS_GATE, g.hash);
         el.classList.add("gate--open");
         document.body.classList.remove("gated");
@@ -102,7 +119,7 @@
       }
     }
     $("#gateGo").addEventListener("click", tryCode);
-    inp.addEventListener("keydown", (e) => { if (e.key === "Enter") tryCode(); });
+    [inp, nameInp, aptInp].forEach((f) => f && f.addEventListener("keydown", (e) => { if (e.key === "Enter") tryCode(); }));
     setTimeout(() => inp.focus(), 300);
   })();
 
@@ -379,7 +396,12 @@
     toast(un ? "Голос отозван" : `Голос учтён за <b>«${esc(opt.title)}»</b>`);
     const A = window.SEANS_API;
     if (A && A.enabled) {
-      A.vote(un ? null : id).then((r) => {
+      let nm = myName();
+      if (!nm && !un) {                       // замок выключен и имени нет — спросим один раз
+        nm = (window.prompt("Подпишись — соседям видно, кто голосует. Как тебя зовут?") || "").trim();
+        if (nm) saveMe(nm, "");
+      }
+      A.vote(un ? null : id, nm, myApt()).then((r) => {
         if (A.state) { A.state.votes = r.votes; A.state.myVote = r.myVote; }
         renderVoting();
       }).catch(() => {});   // сервер лёг — голос остался локально
@@ -446,11 +468,13 @@
   }
   const sgBtn = $("#sgAdd");
   if (sgBtn) {
+    $("#sgName").value = myName();
     const submitSg = async () => {
       const t = $("#sgTitle");
       const title = t.value.trim();
       if (!title) { t.classList.remove("err"); void t.offsetWidth; t.classList.add("err"); t.focus(); return; }
       const name = $("#sgName").value.trim();
+      if (name) saveMe(name, "");
       const A = window.SEANS_API;
       let viaApi = false;
       if (A && A.enabled) {
@@ -688,6 +712,8 @@
       <button class="btn btn--primary btn--block" id="bGo">Забронировать</button>
       <p class="drawer__note">Бронь видна администратору зала. Передумал — отмена в один клик.</p>`;
 
+    $("#bName").value = myName();      // подставляем имя, введённое на входе
+    $("#bApt").value = myApt();
     const updDon = () => {
       if (!don) return;
       const a = $("#bDonSeats"), b = $("#bDonSum");
@@ -705,6 +731,7 @@
         sid, name, apt: $("#bApt").value.trim(), seats, ts: Date.now(),
         don: don ? seats * Number(don.perSeat) : 0,
       };
+      saveMe(name, b.apt);   // запомним для будущих броней/заказов/голосов
       // общий счёт: бронь на сервер (все соседи видят занятые места), офлайн — локально
       const A = window.SEANS_API;
       let viaApi = false;
@@ -834,6 +861,8 @@
               .map((s) => `<option value="${esc(s.id)}">${esc(s.title)} · ${esc(s.day)}, ${esc(s.date)} · ${esc(s.time)}</option>`).join("")}
           </select>
         </label>`;
+      $("#oName").value = myName();
+      $("#oApt").value = myApt();
       btn.textContent = "Подтвердить заказ";
       note.textContent = "Оплата в баре при получении.";
       totalEl.innerHTML = money(cartTotals().sum);
@@ -907,6 +936,7 @@
         name, apt: ($("#oApt")?.value || "").trim(), sid: $("#oSession")?.value || "",
         items, total: items.reduce((a, x) => a + x.price * x.qty, 0), ts: Date.now(),
       };
+      saveMe(name, lastOrder.apt);
       state.orders.push(lastOrder);
       saveOrders();
       // и на сервер — чтобы админ видел заказы всех соседей
