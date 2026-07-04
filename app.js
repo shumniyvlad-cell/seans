@@ -96,13 +96,19 @@
     if (hint && g.hint) hint.textContent = g.hint;
     if (nameInp) nameInp.value = myName();
     if (aptInp) aptInp.value = myApt();
+    const say = (msg, bad) => {              // говорим человеку, что не так — молчаливый шейк никто не понимает
+      if (!hint) return;
+      hint.textContent = msg;
+      hint.classList.toggle("gate__hint--err", !!bad);
+    };
+    const shake = (f) => { f.classList.remove("err"); void f.offsetWidth; f.classList.add("err"); f.focus(); };
     async function tryCode() {
       const raw = (inp.value || "").trim();
-      if (!raw) { inp.focus(); return; }
+      if (!raw) { say("Введи код — он в чате дома", true); shake(inp); return; }
       const nm = (nameInp?.value || "").trim();
       if (nm.length < 2) {                    // подписываемся — соседям видно, кто голосует
-        nameInp.classList.remove("err"); void nameInp.offsetWidth; nameInp.classList.add("err");
-        nameInp.focus();
+        say("Осталось имя: напиши, как тебя зовут", true);
+        shake(nameInp);
         return;
       }
       const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
@@ -114,7 +120,8 @@
         document.body.classList.remove("gated");
         setTimeout(() => { el.hidden = true; }, 650);
       } else {
-        inp.classList.remove("err"); void inp.offsetWidth; inp.classList.add("err");
+        say("Код не подходит — проверь в чате дома", true);
+        shake(inp);
         inp.select();
       }
     }
