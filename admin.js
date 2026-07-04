@@ -48,15 +48,31 @@
   $$("[data-close]", panel).forEach((n) => n.addEventListener("click", close));
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
 
-  /* ---------- вход ---------- */
-  const PIN = String((D.admin && D.admin.pin) || "");
-  const authed = () => !PIN || sessionStorage.getItem("seans_admin_ok") === "1";
-  function requestOpen() {
+  /* ---------- вход ----------
+     PIN в коде сайта НЕ хранится — его знает только сервер (/opt/seans/.env).
+     Введённый PIN проверяется запросом к серверу и живёт до закрытия вкладки.
+     Без сервера (локальная разработка) — сверка с config.admin.pin, если задан. */
+  let PIN = sessionStorage.getItem("seans_admin_pin") || "";
+  const authed = () => !!PIN;
+  async function checkPin(p) {
+    const A = window.SEANS_API;
+    if (A && A.enabled) {
+      try { await A.adminData(p); return true; } catch (e) { return false; }
+    }
+    const local = String((D.admin && D.admin.pin) || "");
+    return !local || p === local;
+  }
+  async function requestOpen() {
     if (authed()) return open();
     const p = prompt("PIN администратора:");
     if (p === null) return;
-    if (p === PIN) { sessionStorage.setItem("seans_admin_ok", "1"); open(); }
-    else alert("Неверный PIN");
+    if (await checkPin(p)) {
+      PIN = p;
+      sessionStorage.setItem("seans_admin_pin", p);
+      open();
+    } else {
+      alert("Неверный PIN");
+    }
   }
   const link = $("#adminLink");
   if (link) link.addEventListener("click", requestOpen);
