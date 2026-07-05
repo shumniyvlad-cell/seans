@@ -10,13 +10,13 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=31" />
+  <link rel="stylesheet" href="styles.css?v=32" />
   <script>
     // Самолечение кэша: браузеры (особенно телефоны) держат старую версию
     // страницы. Сверяемся с version.json на сервере — устарели? Перезагружаемся
     // с уникальным адресом, это гарантированно обходит любой кэш.
     (function () {
-      var BUILD = 31;
+      var BUILD = 32;
       fetch("version.json?nc=" + Date.now(), { cache: "no-store" })
         .then(function (r) { return r.json(); })
         .then(function (v) {
@@ -253,10 +253,10 @@
   <!-- TOAST -->
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <script src="config.js?v=31"></script>
-  <script src="store.js?v=31"></script>
-  <script src="api.js?v=31"></script>
-  <script src="app.js?v=31"></script>
-  <script src="admin.js?v=31"></script>
+  <script src="config.js?v=32"></script>
+  <script src="store.js?v=32"></script>
+  <script src="api.js?v=32"></script>
+  <script src="app.js?v=32"></script>
+  <script src="admin.js?v=32"></script>
 </body>
 </html>

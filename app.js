@@ -17,11 +17,17 @@
   const LS_SG = "seans_suggest_v1";
   const LS_NAME = "seans_name_v1";
   const LS_APT = "seans_apt_v1";
-  const myName = () => localStorage.getItem(LS_NAME) || "";
-  const myApt = () => localStorage.getItem(LS_APT) || "";
+  // cookie-дубль хранилища: встроенные браузеры (Telegram) стирают localStorage
+  // между заходами — cookie переживает чаще, читаем/пишем в оба.
+  const setCk = (k, v) => { try { document.cookie = k + "=" + encodeURIComponent(v) + ";path=/;max-age=31536000;SameSite=Lax"; } catch (e) {} };
+  const getCk = (k) => { const m = document.cookie.match("(?:^|; )" + k.replace(/[.$?*|{}()[\]\\/+^]/g, "\\$&") + "=([^;]*)"); return m ? decodeURIComponent(m[1]) : ""; };
+  const getLS = (k) => { try { return localStorage.getItem(k) || ""; } catch (e) { return ""; } };
+  const setLS = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+  const myName = () => getLS(LS_NAME) || getCk(LS_NAME) || "";
+  const myApt = () => getLS(LS_APT) || getCk(LS_APT) || "";
   const saveMe = (name, apt) => {
-    if (name) localStorage.setItem(LS_NAME, name);
-    if (apt) localStorage.setItem(LS_APT, apt);
+    if (name) { setLS(LS_NAME, name); setCk(LS_NAME, name); }
+    if (apt) { setLS(LS_APT, apt); setCk(LS_APT, apt); }
   };
 
   const money = (n) => (Number(n) || 0).toLocaleString("ru-RU").replace(/\s/g, " ") + " ₽";
@@ -89,45 +95,72 @@
     if (!el) return;
     if (!g || !g.enabled || !g.hash || !window.crypto?.subtle) return;   // замок выключен
     const LS_GATE = "seans_gate_v1";
-    if (localStorage.getItem(LS_GATE) === g.hash) return;                // уже входил
-    el.hidden = false;
-    document.body.classList.add("gated");
-    const inp = $("#gateCode"), nameInp = $("#gateName"), aptInp = $("#gateApt"), hint = $("#gateHint");
-    if (hint && g.hint) hint.textContent = g.hint;
-    if (nameInp) nameInp.value = myName();
-    if (aptInp) aptInp.value = myApt();
-    const say = (msg, bad) => {              // говорим человеку, что не так — молчаливый шейк никто не понимает
-      if (!hint) return;
-      hint.textContent = msg;
-      hint.classList.toggle("gate__hint--err", !!bad);
+    const sha256 = async (s) => {
+      const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+      return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
     };
-    const shake = (f) => { f.classList.remove("err"); void f.offsetWidth; f.classList.add("err"); f.focus(); };
-    async function tryCode() {
-      const raw = (inp.value || "").trim();
-      if (!raw) { say("Введи код — он в чате дома", true); shake(inp); return; }
-      const nm = (nameInp?.value || "").trim();
-      if (nm.length < 2) {                    // подписываемся — соседям видно, кто голосует
-        say("Осталось имя: напиши, как тебя зовут", true);
-        shake(nameInp);
-        return;
+    // «свой» — пишем в оба хранилища сразу (localStorage могут стереть, cookie переживёт)
+    const openUp = () => { setLS(LS_GATE, g.hash); setCk(LS_GATE, g.hash); };
+
+    // 1) уже входил на этом устройстве (localStorage ИЛИ cookie)
+    if (getLS(LS_GATE) === g.hash || getCk(LS_GATE) === g.hash) { openUp(); return; }
+
+    // 2) ссылка-ключ из чата: адрес с #k=<токен> впускает сам и лечит хранилища.
+    //    Токен в адресе НЕ хранится нигде — переживает стирание кэша встроенным браузером.
+    const km = ((location.hash || "") + "&" + (location.search || "")).match(/[#&?]k=([^&#\s]+)/i);
+    const linkTok = km ? decodeURIComponent(km[1]).trim() : "";
+
+    const showGate = () => {
+      el.hidden = false;
+      document.body.classList.add("gated");
+      const inp = $("#gateCode"), nameInp = $("#gateName"), aptInp = $("#gateApt"), hint = $("#gateHint");
+      if (hint && g.hint) hint.textContent = g.hint;
+      if (nameInp) nameInp.value = myName();
+      if (aptInp) aptInp.value = myApt();
+      const say = (msg, bad) => {            // говорим человеку, что не так — молчаливый шейк никто не понимает
+        if (!hint) return;
+        hint.textContent = msg;
+        hint.classList.toggle("gate__hint--err", !!bad);
+      };
+      const shake = (f) => { f.classList.remove("err"); void f.offsetWidth; f.classList.add("err"); f.focus(); };
+      async function tryCode() {
+        const raw = (inp.value || "").trim();
+        if (!raw) { say("Введи код — он в чате дома", true); shake(inp); return; }
+        const nm = (nameInp?.value || "").trim();
+        if (nm.length < 2) {                  // подписываемся — соседям видно, кто голосует
+          say("Осталось имя: напиши, как тебя зовут", true);
+          shake(nameInp);
+          return;
+        }
+        if ((await sha256(raw)) === g.hash) {
+          saveMe(nm, (aptInp?.value || "").trim());
+          openUp();
+          el.classList.add("gate--open");
+          document.body.classList.remove("gated");
+          setTimeout(() => { el.hidden = true; }, 650);
+        } else {
+          say("Код не подходит — проверь в чате дома", true);
+          shake(inp);
+          inp.select();
+        }
       }
-      const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
-      const hex = [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
-      if (hex === g.hash) {
-        saveMe(nm, (aptInp?.value || "").trim());
-        localStorage.setItem(LS_GATE, g.hash);
-        el.classList.add("gate--open");
-        document.body.classList.remove("gated");
-        setTimeout(() => { el.hidden = true; }, 650);
-      } else {
-        say("Код не подходит — проверь в чате дома", true);
-        shake(inp);
-        inp.select();
-      }
+      $("#gateGo").addEventListener("click", tryCode);
+      [inp, nameInp, aptInp].forEach((f) => f && f.addEventListener("keydown", (e) => { if (e.key === "Enter") tryCode(); }));
+      setTimeout(() => inp.focus(), 300);
+    };
+
+    if (linkTok && g.linkHash) {
+      sha256(linkTok).then((h) => {
+        if (h === g.linkHash) {
+          openUp();
+          try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}  // убираем токен из адреса
+        } else {
+          showGate();
+        }
+      }).catch(showGate);
+    } else {
+      showGate();
     }
-    $("#gateGo").addEventListener("click", tryCode);
-    [inp, nameInp, aptInp].forEach((f) => f && f.addEventListener("keydown", (e) => { if (e.key === "Enter") tryCode(); }));
-    setTimeout(() => inp.focus(), 300);
   })();
 
   /* ============================================================
